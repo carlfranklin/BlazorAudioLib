@@ -1,0 +1,132 @@
+﻿@page "/"
+
+<h1>Carl Franklin's BlazorAudioLib Demo</h1>
+
+BlazorAudioLib is a Blazor Component that allows you to:
+<ul>
+    <li>Enumerates audio and video devices</li>
+    <li>Records from a selected audio device with callback for each buffer</li>
+    <li>Plays audio by adding audio buffers to a queue</li>
+</ul>
+
+<button @onclick="GetDevices">Enumerate Media Devices</button>
+<br />
+<br />
+<button disabled="@RecordingDisabled" @onclick="RecordButtonClicked">@RecordButtonText</button>
+<br />
+<br />
+
+<h2>@DeviceStatus</h2>
+<br />
+
+@if (AudioInputDevices.Count > 0)
+{
+    <h3>Audio Input Devices</h3>
+    <select @onchange="AudioInputDeviceSelected">
+        @foreach (var device in AudioInputDevices)
+        {
+            <option value="@device.deviceId">@device.label</option>
+        }
+    </select>
+    <br />
+    <br />
+}
+
+@if (AudioOutputDevices.Count > 0)
+{
+    <h3>Audio Output Devices</h3>
+    <select>
+        @foreach (var device in AudioOutputDevices)
+        {
+            <option value="@device.deviceId">@device.label</option>
+        }
+    </select>
+    <br />
+    <br />
+}
+
+@if (VideoInputDevices.Count > 0)
+{
+    <h3>Video Input Devices</h3>
+    <select>
+        @foreach (var device in VideoInputDevices)
+        {
+            <option value="@device.deviceId">@device.label</option>
+        }
+    </select>
+    <br />
+    <br />
+}
+
+
+<BlazorAudio @ref="BlazorAudio"
+             DeviceStatusChanged="DeviceStatusChanged"
+             AudioInputDevices="AudioInputDevices"
+             AudioOutputDevices="AudioOutputDevices"
+             VideoInputDevices="VideoInputDevices"
+             BufferRecorded="OnAudioBufferRecorded"
+             RecordingStatusChanged="OnRecordingStatusChanged"
+             BuffersBeforePlayback="4"
+             Channels="1"
+             SampleRate="20000"
+             TimeSliceInMilliseconds="500" />
+
+@code
+{
+    BlazorAudio BlazorAudio;
+
+    List<BrowserMediaDevice> AudioInputDevices { get; set; } = new List<BrowserMediaDevice>();
+    List<BrowserMediaDevice> AudioOutputDevices { get; set; } = new List<BrowserMediaDevice>();
+    List<BrowserMediaDevice> VideoInputDevices { get; set; } = new List<BrowserMediaDevice>();
+
+    string DeviceStatus = "";
+    string RecordButtonText = "Start Recording";
+    string SelectedAudioInputDeviceId = "";
+    bool RecordingDisabled = true;
+    bool IsFirstBuffer = true;
+
+    async Task RecordButtonClicked()
+    {
+        if (RecordButtonText == "Start Recording")
+        {
+            IsFirstBuffer = true;
+            await BlazorAudio.StartRecording(SelectedAudioInputDeviceId);
+            RecordButtonText = "Stop Recording";
+        }
+        else
+        {
+            await BlazorAudio.StopRecording();
+            RecordButtonText = "Start Recording";
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task OnAudioBufferRecorded(AudioBuffer Buffer)
+    {
+        await BlazorAudio.PlayByteArray(Buffer.Data, IsFirstBuffer);
+        IsFirstBuffer = false;
+    }
+
+    void OnRecordingStatusChanged(string status)
+    {
+
+    }
+
+    async Task AudioInputDeviceSelected(ChangeEventArgs args)
+    {
+        SelectedAudioInputDeviceId = args.Value.ToString();
+        RecordingDisabled = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task DeviceStatusChanged(string Status)
+    {
+        DeviceStatus = Status;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task GetDevices()
+    {
+        await BlazorAudio.EnumerateDevices();
+    }
+}
